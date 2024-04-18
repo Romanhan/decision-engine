@@ -1,10 +1,15 @@
 package ee.taltech.inbankbackend.service;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import com.github.vladislavgoltjajev.personalcode.locale.estonia.EstonianPersonalCodeValidator;
 
 import ee.taltech.inbankbackend.config.DecisionEngineConstants;
+import ee.taltech.inbankbackend.exceptions.InvalidCountryException;
+import ee.taltech.inbankbackend.exceptions.InvalidCustomerAgeException;
 import ee.taltech.inbankbackend.exceptions.InvalidLoanAmountException;
 import ee.taltech.inbankbackend.exceptions.InvalidLoanPeriodException;
 import ee.taltech.inbankbackend.exceptions.InvalidPersonalCodeException;
@@ -47,14 +52,16 @@ public class DecisionEngine {
 	 * @throws NoValidLoanException         If there is no valid loan found for the
 	 *                                      given ID code, loan amount and loan
 	 *                                      period
+	 * @throws InvalidCustomerAgeException
+	 * @throws InvalidCountryException
 	 */
-	public Decision calculateApprovedLoan(String personalCode, Long loanAmount, int loanPeriod)
+	public Decision calculateApprovedLoan(String personalCode, Long loanAmount, int loanPeriod, String country)
 			throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException,
-			NoValidLoanException {
+			NoValidLoanException, InvalidCountryException, InvalidCustomerAgeException {
 		try {
-			verifyInputs(personalCode, loanAmount, loanPeriod);
+			verifyInputs(personalCode, loanAmount, loanPeriod, country);
 		} catch (Exception e) {
-			return new Decision(null, null, e.getMessage());
+			return new Decision(null, null, null, e.getMessage());
 		}
 		int creditModifier = 0;
 		int outputLoanAmount;
@@ -92,11 +99,20 @@ public class DecisionEngine {
 	 * @throws InvalidLoanAmountException   If the requested loan amount is invalid
 	 * @throws InvalidLoanPeriodException   If the requested loan period is invalid
 	 */
-	private void verifyInputs(String personalCode, Long loanAmount, int loanPeriod)
-			throws InvalidPersonalCodeException, InvalidLoanAmountException, InvalidLoanPeriodException {
+	private void verifyInputs(String personalCode, Long loanAmount, int loanPeriod, String country)
+			throws InvalidCountryException, InvalidPersonalCodeException, InvalidCustomerAgeException,
+			InvalidLoanAmountException, InvalidLoanPeriodException {
 
+		// Validate that country is Baltic region country
+		if (!isBalticCounty(country)) {
+			throw new InvalidCountryException("Invalid Country!");
+		}
 		if (!validator.isValid(personalCode)) {
 			throw new InvalidPersonalCodeException("Invalid personal ID code!");
+		}
+		// Validation of right customer age
+		if (!AgeVerificator.isValidAge(personalCode, loanPeriod)) {
+			throw new InvalidCustomerAgeException("Invalid age for loan!");
 		}
 		if (!(DecisionEngineConstants.MINIMUM_LOAN_AMOUNT <= loanAmount)
 				|| !(loanAmount <= DecisionEngineConstants.MAXIMUM_LOAN_AMOUNT)) {
@@ -107,5 +123,10 @@ public class DecisionEngine {
 			throw new InvalidLoanPeriodException("Invalid loan period!");
 		}
 
+	}
+
+	private boolean isBalticCounty(String country) {
+		List<String> balticCounties = Arrays.asList(DecisionEngineConstants.BALTIC_COUNTRIES);
+		return balticCounties.contains(country);
 	}
 }
