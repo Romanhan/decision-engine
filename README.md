@@ -1,4 +1,4 @@
-# InBank Backend Service
+# Backend Service
 
 This service provides a REST API for calculating an approved loan amount and period for a customer.
 The loan amount is calculated based on the customer's credit modifier, which is determined by the last four
